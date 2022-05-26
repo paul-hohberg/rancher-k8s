@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-core
+  namespace: harbor-ns
+spec:
+  secretName: harbor-core-tls
+  issuerRef:
+    name: intca2
+    kind: ClusterIssuer
+  commonName: harbor-core.example.com
+  dnsNames:
+  - harbor-core.example.com
+  - harbor-core

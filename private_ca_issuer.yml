@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: intca2
+spec:
+  acme:
+    server: https://intca2.example.com/acme/acme/directory
+    privateKeySecretRef:
+      name: intca2-key
+    solvers:
+    - http01:
+       ingress:
+         class: nginx

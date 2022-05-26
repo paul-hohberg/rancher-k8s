@@ -1,0 +1,137 @@
+# Sample namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor-ns
+  annotations:
+#Adds to Harbor Project. Remove if different Project is used.
+   field.cattle.io/projectId: c-p42r2:p-pnjvv
+---
+# A secret of harbor admin password.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-core-secret
+  namespace: harbor-ns
+data:
+  secret: base64-encoded-secret 
+type: Opaque
+---
+# Certificates of ingress
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: public-certificate
+  namespace: harbor-ns
+spec:
+  secretName: public-certifcate
+  issuerRef:
+    name: intca2
+    kind: ClusterIssuer
+  commonName: harbor-core.example.com
+  dnsNames:
+  - harbor-core.example.com
+  - harbor-core
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-registry
+  namespace: harbor-ns
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 150Gi
+---
+# Full stack Harbor
+apiVersion: goharbor.io/v1beta1
+kind: HarborCluster
+metadata:
+  name: harborcluster
+  namespace: harbor-ns
+spec:
+  version: 2.4.0
+  logLevel: info
+  imageSource:
+    repository: ghcr.io/goharbor
+  harborAdminPasswordRef: admin-core-secret
+  externalURL: https://harbor-core.example.com
+  expose:
+    core:
+      ingress:
+        host: harbor-core.example.com
+        controller: default
+      tls:
+        certificateRef: public-certificate
+  internalTLS:
+    enabled: true
+  portal: {}
+  registry:
+    metrics:
+      enabled: true
+  core:
+    tokenIssuer:
+      name: selfsigned-issuer
+      kind: Issuer
+    metrics:
+      enabled: true
+  exporter: {}
+  database:
+    kind: Zlando/PostgreSQL
+    spec:
+      zlandoPostgreSql:
+        operatorVersion: "1.5.0"
+        storage: 1Gi
+        replicas: 1
+        resources:
+          limits:
+            cpu: 500m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 250Mi
+  storage:
+    kind: FileSystem
+    spec:
+      fileSystem:
+        registryPersistentVolume:
+          claimName: harbor-registry
+  cache:
+    kind: RedisFailover
+    spec:
+      redisFailover:
+        operatorVersion: "1.0.0"
+        server:
+          replicas: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+            requests:
+              cpu: 100m
+              memory: 250Mi
+        sentinel:
+          replicas: 1
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: harbor-self-signed-ca
+  namespace: harbor-ns
+data:
+  tls.crt: cert
+  tls.key: key
+---
+# Cert issuer
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: harbor-ns
+spec:
+  ca:
+    secretName: harbor-self-signed-ca
